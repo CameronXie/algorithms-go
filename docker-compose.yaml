@@ -1,0 +1,11 @@
+version: '3'
+services:
+  go:
+    container_name: algorithms_go
+    build:
+      context: ./docker/golang
+    volumes:
+      - './:/go/algorithms'
+    working_dir: '/go/algorithms'
+    command: [ '/bin/sh', '-c', 'tail -f /dev/null' ]
+    restart: always
