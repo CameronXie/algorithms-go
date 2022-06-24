@@ -1,47 +1,39 @@
 package quick
 
-func Sort(s []int) []int {
-	t := make([]int, len(s))
-	copy(t, s)
+import (
+	"sort"
+)
 
-	sort(t)
-	return t
+func Sort(data sort.Interface) {
+	quickSort(data, 0, data.Len()-1)
 }
 
-func sort(s []int) {
-	if len(s) <= 1 {
+func quickSort(data sort.Interface, min, max int) {
+	if min >= max {
 		return
 	}
 
-	index := partition(s)
-
-	sort(s[:index])
-	sort(s[index:])
-}
-
-func partition(s []int) int {
-	index := len(s) - 1
-	pivot := s[index]
-
-	for left, right := 0, index-1; left < right; {
-		for s[left] < pivot && left < right {
-			left++
+	pivot := max
+	for left, right := min, max-1; left <= right; {
+		for ; data.Less(left, max) && left < right; left++ {
 		}
 
-		for s[right] >= pivot && right > left {
-			right--
+		for ; data.Less(max, right) && left < right; right-- {
 		}
 
 		if left != right {
-			s[left], s[right] = s[right], s[left]
+			data.Swap(left, right)
 			continue
 		}
 
-		if s[right] > pivot {
-			index = right
+		if data.Less(max, right) {
+			data.Swap(max, right)
+			pivot = right
 		}
+
+		break
 	}
 
-	s[index], s[len(s)-1] = s[len(s)-1], s[index]
-	return index
+	quickSort(data, 0, pivot-1)
+	quickSort(data, pivot+1, max)
 }

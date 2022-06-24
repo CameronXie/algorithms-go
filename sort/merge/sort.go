@@ -1,35 +1,39 @@
 package merge
 
-func Sort(s []int) []int {
-	t := make([]int, len(s))
-	copy(t, s)
-
-	return sort(t)
+type Interface interface {
+	Less(i any) bool
 }
 
-func sort(s []int) []int {
-	l := len(s)
-	if l <= 1 {
-		return s
+func Sort[T Interface](data []T) []T {
+	copied := make([]T, 0)
+	copy(copied, data)
+
+	return divide(copied)
+}
+
+func divide[T Interface](data []T) []T {
+	n := len(data)
+	if n <= 1 {
+		return data
 	}
 
-	m := l / 2
-	return merge(sort(s[:m]), sort(s[m:]))
+	pivot := n / 2
+	return merge(divide(data[:pivot]), divide(data[pivot:]))
 }
 
-func merge(left, right []int) []int {
-	res := make([]int, 0)
+func merge[T Interface](left, right []T) []T {
+	res := make([]T, 0)
 	i, j := 0, 0
 
 	for i < len(left) && j < len(right) {
-		if left[i] > right[j] {
-			res = append(res, right[j])
-			j++
+		if left[i].Less(right[j]) {
+			res = append(res, left[i])
+			i++
 			continue
 		}
 
-		res = append(res, left[i])
-		i++
+		res = append(res, right[j])
+		j++
 	}
 
 	return append(res, append(left[i:], right[j:]...)...)

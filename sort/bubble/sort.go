@@ -1,16 +1,16 @@
 package bubble
 
-func Sort(s []int) []int {
-	t := make([]int, len(s))
-	copy(t, s)
+import (
+	"sort"
+)
 
-	for i := len(t); i > 1; i-- {
+func Sort(data sort.Interface) {
+	n := data.Len()
+	for i := n; i > 1; i-- {
 		for j := 0; j < i-1; j++ {
-			if t[j] > t[j+1] {
-				t[j], t[j+1] = t[j+1], t[j]
+			if !data.Less(j, j+1) {
+				data.Swap(j, j+1)
 			}
 		}
 	}
-
-	return t
 }

@@ -1,20 +1,18 @@
 package selection
 
-func Sort(s []int) []int {
-	t := make([]int, len(s))
-	copy(t, s)
+import "sort"
 
-	l := len(t)
-	for i := 0; i < l; i++ {
-		minIndex := i
-		for j := i + 1; j < l; j++ {
-			if t[minIndex] > t[j] {
-				minIndex = j
+func Sort(data sort.Interface) {
+	n := data.Len()
+
+	for i := 0; i < n; i++ {
+		minIdx := i
+		for j := i + 1; j < n; j++ {
+			if !data.Less(minIdx, j) {
+				data.Swap(minIdx, j)
 			}
 		}
 
-		t[i], t[minIndex] = t[minIndex], t[i]
+		data.Swap(i, minIdx)
 	}
-
-	return t
 }
