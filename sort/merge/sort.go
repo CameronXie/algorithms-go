@@ -5,7 +5,7 @@ type Interface interface {
 }
 
 func Sort[T Interface](data []T) []T {
-	copied := make([]T, 0)
+	copied := make([]T, len(data))
 	copy(copied, data)
 
 	return divide(copied)

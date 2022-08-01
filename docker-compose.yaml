@@ -4,6 +4,7 @@ services:
     container_name: algorithms_go
     build:
       context: ./docker/golang
+    platform: linux/amd64
     volumes:
       - './:/go/algorithms'
     working_dir: '/go/algorithms'

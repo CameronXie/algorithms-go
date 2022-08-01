@@ -39,6 +39,6 @@ func TestSort(t *testing.T) {
 
 type sortableInt int
 
-func (s sortableInt) Less(i Interface) bool {
+func (s sortableInt) Less(i any) bool {
 	return s < i.(sortableInt)
 }

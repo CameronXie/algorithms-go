@@ -22,4 +22,4 @@ test:
 	@go tool cover -html=${testOutputDir}/cp.out -o ${testOutputDir}/cp.html
 
 lint:
-	@golangci-lint run ./tree/... -v
+	@golangci-lint run ./... -v

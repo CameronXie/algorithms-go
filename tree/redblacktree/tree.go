@@ -2,7 +2,10 @@ package redblacktree
 
 import (
 	"fmt"
+	"github.com/CameronXie/algorithms-go/tree"
+	"golang.org/x/exp/constraints"
 	"io"
+	"sync"
 )
 
 const (
@@ -12,29 +15,212 @@ const (
 	positionRight = false
 )
 
-type Tree struct {
-	root *Node
+type Node[K constraints.Ordered, V any] struct {
+	key   K
+	value V
+
+	parent *Node[K, V]
+	left   *Node[K, V]
+	right  *Node[K, V]
+	colour bool
 }
 
-func (t *Tree) ToList() []*Node {
+func (n *Node[K, V]) Traversal() []*Node[K, V] {
+	l := []*Node[K, V]{n}
+
+	for i := 0; i < len(l); i++ {
+		if l[i].left != nil {
+			l = append(l, l[i].left)
+		}
+
+		if l[i].right != nil {
+			l = append(l, l[i].right)
+		}
+	}
+
+	return l
+}
+
+func (n *Node[K, V]) String() string {
+	colour := "BLACK"
+	if n.colour == colourRed {
+		colour = "RED"
+	}
+
+	return fmt.Sprintf("%v-%v(%v)", n.key, n.value, colour)
+}
+
+func (n *Node[K, V]) Left() tree.Node {
+	return n.left
+}
+
+func (n *Node[K, V]) Right() tree.Node {
+	return n.right
+}
+
+func (n *Node[K, V]) search(i K) (*Node[K, V], error) {
+	if i > n.key {
+		if n.right == nil {
+			return nil, valueNotExistsError(i)
+		}
+
+		return n.right.search(i)
+	}
+
+	if i < n.key {
+		if n.left == nil {
+			return nil, valueNotExistsError(i)
+		}
+
+		return n.left.search(i)
+	}
+
+	return n, nil
+}
+
+func (n *Node[K, V]) insertNode(node *Node[K, V]) error {
+	if node.key > n.key {
+		if n.right == nil {
+			n.addChildNode(node, positionRight)
+			return nil
+		}
+
+		return n.right.insertNode(node)
+	}
+
+	if node.key < n.key {
+		if n.left == nil {
+			n.addChildNode(node, positionLeft)
+			return nil
+		}
+
+		return n.left.insertNode(node)
+	}
+
+	return valueAlreadyExistsError(node.key)
+}
+
+func (n *Node[K, V]) getChildNodePosition(child *Node[K, V]) bool {
+	if n.left != nil && n.left.key == child.key {
+		return positionLeft
+	}
+
+	if n.right != nil && n.right.key == child.key {
+		return positionRight
+	}
+
+	panic(invalidChildError(n.key, child.key))
+}
+
+func (n *Node[K, V]) addChildNode(newNode *Node[K, V], position bool) {
+	if newNode != nil {
+		newNode.parent = n
+	}
+
+	if position == positionLeft {
+		n.left = newNode
+		return
+	}
+
+	n.right = newNode
+}
+
+func (n *Node[K, V]) replaceChildNode(old, new *Node[K, V]) {
+	p := n.getChildNodePosition(old)
+
+	n.removeChildNode(old)
+	n.addChildNode(new, p)
+}
+
+func (n *Node[K, V]) removeChildNode(childNode *Node[K, V]) {
+	if n.left != nil && n.left.key == childNode.key {
+		n.left = nil
+		childNode.parent = nil
+		return
+	}
+
+	if n.right != nil && n.right.key == childNode.key {
+		n.right = nil
+		childNode.parent = nil
+		return
+	}
+
+	panic(invalidChildError(childNode.key, n.key))
+}
+
+func (n *Node[K, V]) getSibling() *Node[K, V] {
+	if n.parent == nil {
+		return nil
+	}
+
+	if n.parent.getChildNodePosition(n) == positionLeft {
+		return n.parent.right
+	}
+
+	return n.parent.left
+}
+
+func (n *Node[K, V]) getUncle() *Node[K, V] {
+	if n.parent == nil || n.parent.parent == nil {
+		return nil
+	}
+
+	return n.parent.getSibling()
+}
+
+func (n *Node[K, V]) getMinimumNode() *Node[K, V] {
+	if n.left == nil {
+		return n
+	}
+
+	return n.left.getMinimumNode()
+}
+
+func isBlackNode[K constraints.Ordered, V any](n *Node[K, V]) bool {
+	if n == nil || n.colour == colourBlack {
+		return true
+	}
+
+	return false
+}
+
+type Tree[K constraints.Ordered, V any] struct {
+	sync.RWMutex
+	root *Node[K, V]
+}
+
+func (t *Tree[K, V]) ToList() []*Node[K, V] {
+	t.RLock()
+	defer t.RUnlock()
+
 	if t.root == nil {
-		return make([]*Node, 0)
+		return make([]*Node[K, V], 0)
 	}
 
 	return t.root.Traversal()
 }
 
-func (t *Tree) Search(i int) (*Node, error) {
-	return t.root.search(i)
+func (t *Tree[K, V]) Search(key K) (*Node[K, V], error) {
+	t.RLock()
+	defer t.RUnlock()
+
+	if t.root == nil {
+		return nil, valueNotExistsError(key)
+	}
+
+	return t.root.search(key)
 }
 
-func (t *Tree) Insert(i int) error {
+func (t *Tree[K, V]) Insert(key K, value V) error {
+	t.Lock()
+	defer t.Unlock()
+
 	if t.root == nil {
-		t.root = &Node{value: i, colour: colourBlack}
+		t.root = &Node[K, V]{key: key, value: value, colour: colourBlack}
 		return nil
 	}
 
-	newNode := &Node{value: i, colour: colourRed}
+	newNode := &Node[K, V]{key: key, value: value, colour: colourRed}
 	if err := t.root.insertNode(newNode); err != nil {
 		return err
 	}
@@ -43,7 +229,7 @@ func (t *Tree) Insert(i int) error {
 	return nil
 }
 
-func (t *Tree) rebalanceAfterInsertion(n *Node) {
+func (t *Tree[K, V]) rebalanceAfterInsertion(n *Node[K, V]) {
 	// it is root.
 	if n.parent == nil {
 		n.colour = colourBlack
@@ -99,12 +285,15 @@ func (t *Tree) rebalanceAfterInsertion(n *Node) {
 	parent.left.colour = colourRed
 }
 
-func (t *Tree) Delete(i int) error {
+func (t *Tree[K, V]) Delete(i K) error {
+	t.Lock()
+	defer t.Unlock()
+
 	if t.root == nil {
 		return valueNotExistsError(i)
 	}
 
-	deleteNode, err := t.Search(i)
+	deleteNode, err := t.root.search(i)
 	if err != nil {
 		return err
 	}
@@ -144,6 +333,7 @@ func (t *Tree) Delete(i int) error {
 
 	// node has two children.
 	successor := deleteNode.right.getMinimumNode()
+	deleteNode.key = successor.key
 	deleteNode.value = successor.value
 	successor.parent.replaceChildNode(successor, successor.right)
 
@@ -154,7 +344,7 @@ func (t *Tree) Delete(i int) error {
 	return nil
 }
 
-func (t *Tree) rebalanceAfterDeletion(n *Node) {
+func (t *Tree[K, V]) rebalanceAfterDeletion(n *Node[K, V]) {
 	// node is root or is red.
 	if n.colour == colourRed || n.parent == nil {
 		n.colour = colourBlack
@@ -230,7 +420,7 @@ func (t *Tree) rebalanceAfterDeletion(n *Node) {
 	t.rotateRight(n.parent)
 }
 
-func (t *Tree) rotateLeft(n *Node) {
+func (t *Tree[K, V]) rotateLeft(n *Node[K, V]) {
 	rightChild := n.right
 
 	n.removeChildNode(rightChild)
@@ -242,7 +432,7 @@ func (t *Tree) rotateLeft(n *Node) {
 	rightChild.addChildNode(n, positionLeft)
 }
 
-func (t *Tree) rotateRight(n *Node) {
+func (t *Tree[K, V]) rotateRight(n *Node[K, V]) {
 	leftChild := n.left
 
 	n.removeChildNode(leftChild)
@@ -254,7 +444,7 @@ func (t *Tree) rotateRight(n *Node) {
 	leftChild.addChildNode(n, positionRight)
 }
 
-func (t *Tree) replaceChildNote(oldNote *Node, newNote *Node) {
+func (t *Tree[K, V]) replaceChildNote(oldNote *Node[K, V], newNote *Node[K, V]) {
 	parent := oldNote.parent
 	if parent != nil {
 		parent.replaceChildNode(oldNote, newNote)
@@ -264,219 +454,26 @@ func (t *Tree) replaceChildNote(oldNote *Node, newNote *Node) {
 	t.root = newNote
 }
 
-func (t *Tree) Print(w io.StringWriter) error {
+func (t *Tree[K, V]) Print(w io.StringWriter) error {
+	t.RLock()
+	defer t.RUnlock()
+
 	if t.root == nil {
 		_, err := w.WriteString("empty\n")
 		return err
 	}
 
-	return t.root.Print(w)
+	return tree.Print(t.root, w)
 }
 
-type Node struct {
-	value  int
-	parent *Node
-	left   *Node
-	right  *Node
-	colour bool
+func valueAlreadyExistsError(i any) error {
+	return fmt.Errorf(`key %v already exists`, i)
 }
 
-func (n *Node) Traversal() []*Node {
-	l := []*Node{n}
-
-	for i := 0; i < len(l); i++ {
-		if l[i].left != nil {
-			l = append(l, l[i].left)
-		}
-
-		if l[i].right != nil {
-			l = append(l, l[i].right)
-		}
-	}
-
-	return l
+func valueNotExistsError(i any) error {
+	return fmt.Errorf(`key %v not exists`, i)
 }
 
-func (n *Node) Print(w io.StringWriter) error {
-	return n.print(w, "", "", false, false)
-}
-
-func (n *Node) print(w io.StringWriter, indent string, position string, isOpen bool, isLast bool) error {
-	colour := "BLACK"
-	if n.colour == colourRed {
-		colour = "RED"
-	}
-
-	cornerSymbol := "|"
-	if isLast {
-		cornerSymbol = "`"
-	}
-
-	if position != "" {
-		position = fmt.Sprintf("%v---%v: ", cornerSymbol, position)
-	}
-
-	if _, err := w.WriteString(fmt.Sprintf("%v%v%v(%v)\n", indent, position, n.value, colour)); err != nil {
-		return err
-	}
-
-	if n.parent != nil {
-		if isOpen {
-			indent += "|   "
-		} else {
-			indent += "    "
-		}
-	}
-
-	if n.left != nil {
-		if err := n.left.print(w, indent, "L", true, n.right == nil); err != nil {
-			return err
-		}
-	}
-
-	if n.right != nil {
-		if err := n.right.print(w, indent, "R", false, true); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (n *Node) search(i int) (*Node, error) {
-	if i > n.value {
-		if n.right == nil {
-			return nil, valueNotExistsError(i)
-		}
-
-		return n.right.search(i)
-	}
-
-	if i < n.value {
-		if n.left == nil {
-			return nil, valueNotExistsError(i)
-		}
-
-		return n.left.search(i)
-	}
-
-	return n, nil
-}
-
-func (n *Node) insertNode(node *Node) error {
-	if node.value > n.value {
-		if n.right == nil {
-			n.addChildNode(node, positionRight)
-			return nil
-		}
-
-		return n.right.insertNode(node)
-	}
-
-	if node.value < n.value {
-		if n.left == nil {
-			n.addChildNode(node, positionLeft)
-			return nil
-		}
-
-		return n.left.insertNode(node)
-	}
-
-	return valueAlreadyExistsError(node.value)
-}
-
-func (n *Node) getChildNodePosition(child *Node) bool {
-	if n.left != nil && n.left.value == child.value {
-		return positionLeft
-	}
-
-	if n.right != nil && n.right.value == child.value {
-		return positionRight
-	}
-
-	panic(invalidChildError(n.value, child.value))
-}
-
-func (n *Node) addChildNode(newNode *Node, position bool) {
-	if newNode != nil {
-		newNode.parent = n
-	}
-
-	if position == positionLeft {
-		n.left = newNode
-		return
-	}
-
-	n.right = newNode
-}
-
-func (n *Node) replaceChildNode(old, new *Node) {
-	p := n.getChildNodePosition(old)
-
-	n.removeChildNode(old)
-	n.addChildNode(new, p)
-}
-
-func (n *Node) removeChildNode(childNode *Node) {
-	if n.left != nil && n.left.value == childNode.value {
-		n.left = nil
-		childNode.parent = nil
-		return
-	}
-
-	if n.right != nil && n.right.value == childNode.value {
-		n.right = nil
-		childNode.parent = nil
-		return
-	}
-
-	panic(invalidChildError(childNode.value, n.value))
-}
-
-func (n *Node) getSibling() *Node {
-	if n.parent == nil {
-		return nil
-	}
-
-	if n.parent.getChildNodePosition(n) == positionLeft {
-		return n.parent.right
-	}
-
-	return n.parent.left
-}
-
-func (n *Node) getUncle() *Node {
-	if n.parent == nil || n.parent.parent == nil {
-		return nil
-	}
-
-	return n.parent.getSibling()
-}
-
-func (n *Node) getMinimumNode() *Node {
-	if n.left == nil {
-		return n
-	}
-
-	return n.left.getMinimumNode()
-}
-
-func isBlackNode(n *Node) bool {
-	if n == nil || n.colour == colourBlack {
-		return true
-	}
-
-	return false
-}
-
-func valueAlreadyExistsError(i int) error {
-	return fmt.Errorf(`value %v already exists`, i)
-}
-
-func valueNotExistsError(i int) error {
-	return fmt.Errorf(`value %v not exists`, i)
-}
-
-func invalidChildError(p, c int) error {
+func invalidChildError(p, c any) error {
 	return fmt.Errorf(`%v is not a child node of %v node`, c, p)
 }

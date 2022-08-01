@@ -10,4 +10,6 @@
 
 ## Tree
 
+* [`D-ary Heap`](./tree/heap)
+* [`Treap`](./tree/treap)
 * [`Red-Black Tree`](./tree/redblacktree)
