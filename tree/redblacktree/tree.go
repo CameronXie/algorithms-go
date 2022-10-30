@@ -372,6 +372,10 @@ func (t *Tree[K, V]) rebalanceAfterDeletion(n *Node[K, V]) {
 		sibling = n.getSibling()
 	}
 
+	if sibling == nil {
+		return
+	}
+
 	// sibling node is black and both sibling's children node are black.
 	if isBlackNode(sibling.left) && isBlackNode(sibling.right) {
 		sibling.colour = colourRed

@@ -1,4 +1,4 @@
-FROM golang:1.18-buster
+FROM golang:1.19-bullseye
 
 ENV GolangCILint_Version=1.45.2
 
