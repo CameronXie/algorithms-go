@@ -11,41 +11,41 @@ type Node interface {
 }
 
 type DHeap[T Node] struct {
-	sync.RWMutex
 	nodes *[]T
 	d     int
 	m     map[string]int
+	mu    sync.RWMutex
 }
 
 func (dh *DHeap[T]) Len() int {
-	dh.RLock()
-	defer dh.RUnlock()
+	dh.mu.RLock()
+	defer dh.mu.RUnlock()
 
 	return dh.len()
 }
 
 func (dh *DHeap[T]) Peek() Node {
-	dh.RLock()
-	defer dh.RUnlock()
+	dh.mu.RLock()
+	defer dh.mu.RUnlock()
 
 	return (*dh.nodes)[0]
 }
 
 func (dh *DHeap[T]) Find(id string) (Node, error) {
-	dh.RLock()
-	defer dh.RUnlock()
+	dh.mu.RLock()
+	defer dh.mu.RUnlock()
 
 	idx, ok := dh.m[id]
 	if !ok {
-		return nil, fmt.Errorf(`id %v not found`, id)
+		return nil, itemNotExistsError(id)
 	}
 
 	return (*dh.nodes)[idx], nil
 }
 
 func (dh *DHeap[T]) Pop() Node {
-	dh.Lock()
-	defer dh.Unlock()
+	dh.mu.Lock()
+	defer dh.mu.Unlock()
 
 	n := dh.len() - 1
 	if n < 0 {
@@ -57,42 +57,49 @@ func (dh *DHeap[T]) Pop() Node {
 	return dh.pop()
 }
 
-func (dh *DHeap[T]) Push(data any) {
-	dh.Lock()
-	defer dh.Unlock()
+func (dh *DHeap[T]) Push(node T) error {
+	dh.mu.Lock()
+	defer dh.mu.Unlock()
 
-	node := data.(T)
+	id := node.GetUniqueID()
+	if _, ok := dh.m[id]; ok {
+		return itemAlreadyExistsError(id)
+	}
+
 	*dh.nodes = append(*dh.nodes, node)
 	n := dh.len() - 1
-	dh.m[node.GetUniqueID()] = n
+	dh.m[id] = n
 	dh.up(n)
+
+	return nil
 }
 
-func (dh *DHeap[T]) Update(id string, data any) error {
-	dh.Lock()
-	defer dh.Unlock()
+func (dh *DHeap[T]) Update(id string, updates func(old T) T) error {
+	dh.mu.Lock()
+	defer dh.mu.Unlock()
 
 	idx, ok := dh.m[id]
 	if !ok {
-		return fmt.Errorf(`id %v not found`, id)
+		return itemNotExistsError(id)
 	}
 
+	old := (*dh.nodes)[idx]
+	data := updates(old)
 	delete(dh.m, id)
-	node := data.(T)
-	(*dh.nodes)[idx] = node
-	dh.m[node.GetUniqueID()] = idx
+	(*dh.nodes)[idx] = data
+	dh.m[data.GetUniqueID()] = idx
 	dh.fix(idx, dh.len())
 
 	return nil
 }
 
 func (dh *DHeap[T]) Remove(id string) (Node, error) {
-	dh.Lock()
-	defer dh.Unlock()
+	dh.mu.Lock()
+	defer dh.mu.Unlock()
 
 	idx, ok := dh.m[id]
 	if !ok {
-		return nil, fmt.Errorf(`id %v not found`, id)
+		return nil, itemNotExistsError(id)
 	}
 
 	n := dh.len() - 1
@@ -183,6 +190,14 @@ func (dh *DHeap[T]) down(idx, n int) bool {
 	}
 
 	return current > idx
+}
+
+func itemAlreadyExistsError(id string) error {
+	return fmt.Errorf(`id %v already exists`, id)
+}
+
+func itemNotExistsError(id string) error {
+	return fmt.Errorf(`id %v not found`, id)
 }
 
 func New[T Node](d int, items *[]T) *DHeap[T] {

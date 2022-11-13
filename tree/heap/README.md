@@ -41,7 +41,7 @@ func main() {
 
 	dh := heap.New(3, items)
 
-	dh.Push(Item{Priority: 2, Value: "E"})
+	_ = dh.Push(Item{Priority: 2, Value: "E"})
 
 	n, _ := dh.Find("E")
 	fmt.Println(n)
@@ -51,18 +51,20 @@ func main() {
 	fmt.Println(dn)
 	// output: {1 B}
 
-	_ = dh.Update("E", Item{Priority: 6, Value: "E"})
+	_ = dh.Update("E", func(old Item) Item {
+		return Item{Priority: old.Priority + 4, Value: "E"}
+	})
 
 	for dh.Len() > 0 {
 		fmt.Println(dh.Pop())
 	}
 	/*
-	    output:
+		    output:
 
-		{6 E}
-		{5 C}
-		{4 D}
-		{3 A}
+			{6 E}
+			{5 C}
+			{4 D}
+			{3 A}
 	*/
 }
 ```

@@ -119,6 +119,7 @@ func TestDHeap_Push(t *testing.T) {
 	cases := map[string]struct {
 		item     testItem
 		expected []testItem
+		err      error
 	}{
 		"push item": {
 			item: testItem{Priority: 6, Value: "F"},
@@ -131,16 +132,28 @@ func TestDHeap_Push(t *testing.T) {
 				{Priority: 1, Value: "D"},
 			},
 		},
+		"push exists item": {
+			item: testItem{Priority: 6, Value: "A"},
+			expected: []testItem{
+				{Priority: 5, Value: "B"},
+				{Priority: 4, Value: "E"},
+				{Priority: 3, Value: "C"},
+				{Priority: 2, Value: "A"},
+				{Priority: 1, Value: "D"},
+			},
+			err: errors.New("id A already exists"),
+		},
 	}
 
 	for n, tc := range cases {
 		t.Run(n, func(t *testing.T) {
 			a := assert.New(t)
 			dh := setupTestData()
-			dh.Push(tc.item)
+			err := dh.Push(tc.item)
 
 			items := getItems(dh)
 			a.Equal(tc.expected, items)
+			a.Equal(tc.err, err)
 		})
 	}
 }
@@ -156,7 +169,7 @@ func TestDHeap_Update(t *testing.T) {
 			updatedID:   "C",
 			updatedItem: testItem{Priority: 6, Value: "C_Updated"},
 			expected: []testItem{
-				{Priority: 6, Value: "C_Updated"},
+				{Priority: 9, Value: "C_Updated"},
 				{Priority: 5, Value: "B"},
 				{Priority: 4, Value: "E"},
 				{Priority: 2, Value: "A"},
@@ -180,7 +193,12 @@ func TestDHeap_Update(t *testing.T) {
 		t.Run(n, func(t *testing.T) {
 			a := assert.New(t)
 			dh := setupTestData()
-			err := dh.Update(tc.updatedID, tc.updatedItem)
+			err := dh.Update(tc.updatedID, func(old testItem) testItem {
+				return testItem{
+					Priority: tc.updatedItem.Priority + old.Priority,
+					Value:    tc.updatedItem.Value,
+				}
+			})
 
 			if tc.err != nil {
 				a.Equal(tc.err, err)
@@ -266,7 +284,9 @@ func TestDHeap_ConcurrentWrite(t *testing.T) {
 				go func(id string, value testItem) {
 					defer wg.Done()
 					time.Sleep(time.Millisecond)
-					_ = dh.Update(id, value)
+					_ = dh.Update(id, func(_ testItem) testItem {
+						return value
+					})
 				}(id, value)
 			}
 
@@ -315,7 +335,9 @@ func TestDHeap_ConcurrentRead(t *testing.T) {
 			for id, value := range tc.updates {
 				go func(id string, value testItem) {
 					defer wg.Done()
-					_ = dh.Update(id, value)
+					_ = dh.Update(id, func(_ testItem) testItem {
+						return value
+					})
 				}(id, value)
 
 				go func() {
