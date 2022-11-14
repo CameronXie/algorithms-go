@@ -4,7 +4,7 @@ A Golang implementation of Treap.
 
 ## Features
 
-* Treap operations `Search`, `Insert`, `Update`, and `Delete`.
+* Treap operations `Search`, `Insert`, `Update`, `Pop`, and `Delete`.
 * Thread safe.
 * Supported print Treap.
 
@@ -24,8 +24,12 @@ import (
 )
 
 func main() {
-	h := treap.New[string, int](func(i, j int) bool {
-		return i > j
+	h := treap.New[string, int](func(i, j *treap.Node[string, int]) bool {
+		if i.Priority() == j.Priority() {
+			return i.Key() < j.Key()
+		}
+
+		return i.Priority() > j.Priority()
 	})
 
 	_ = h.Insert(treap.NewNode("A", 3))
@@ -62,5 +66,23 @@ func main() {
 		    |---L: A(3)
 		    `---R: D(4)
 	*/
+
+	_ = h.Insert(treap.NewNode("F", 4))
+	for i := h.Pop(); i != nil; i = h.Pop() {
+		fmt.Printf("%v (%v)\n", i.Key(), i.Priority())
+	}
+
+	/*
+		output:
+
+		E (6)
+		C (5)
+		D (4)
+		F (4)
+		A (3)
+	*/
+
+	_ = h.Print(os.Stdout)
+	// output: empty
 }
 ```

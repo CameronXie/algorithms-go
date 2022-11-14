@@ -34,6 +34,14 @@ func (n *Node[K, P]) Right() tree.Node {
 	return n.right
 }
 
+func (n *Node[K, P]) Key() K {
+	return n.key
+}
+
+func (n *Node[K, P]) Priority() P {
+	return n.priority
+}
+
 func (n *Node[K, P]) traversal() []*Node[K, P] {
 	l := []*Node[K, P]{n}
 
@@ -146,14 +154,14 @@ func NewNode[K ~string, P constraints.Integer](key K, priority P) *Node[K, P] {
 }
 
 type Treap[K ~string, P constraints.Integer] struct {
-	sync.RWMutex
 	root *Node[K, P]
-	less func(i, j P) bool
+	less func(i, j *Node[K, P]) bool
+	mu   sync.RWMutex
 }
 
 func (t *Treap[K, P]) Search(key K) (*Node[K, P], error) {
-	t.RLock()
-	defer t.RUnlock()
+	t.mu.RLock()
+	defer t.mu.RUnlock()
 
 	if t.root == nil {
 		return nil, valueNotExistsError(string(key))
@@ -163,8 +171,8 @@ func (t *Treap[K, P]) Search(key K) (*Node[K, P], error) {
 }
 
 func (t *Treap[K, P]) Print(w io.StringWriter) error {
-	t.RLock()
-	defer t.RUnlock()
+	t.mu.RLock()
+	defer t.mu.RUnlock()
 
 	if t.root == nil {
 		_, err := w.WriteString("empty\n")
@@ -175,8 +183,8 @@ func (t *Treap[K, P]) Print(w io.StringWriter) error {
 }
 
 func (t *Treap[K, P]) Insert(n *Node[K, P]) error {
-	t.Lock()
-	defer t.Unlock()
+	t.mu.Lock()
+	defer t.mu.Unlock()
 
 	if t.root == nil {
 		t.root = n
@@ -192,8 +200,8 @@ func (t *Treap[K, P]) Insert(n *Node[K, P]) error {
 }
 
 func (t *Treap[K, P]) Update(key K, priority P) error {
-	t.Lock()
-	defer t.Unlock()
+	t.mu.Lock()
+	defer t.mu.Unlock()
 
 	if t.root == nil {
 		return valueNotExistsError(string(key))
@@ -206,7 +214,7 @@ func (t *Treap[K, P]) Update(key K, priority P) error {
 
 	oldPriority := n.priority
 	n.priority = priority
-	if t.less(n.priority, oldPriority) {
+	if t.less(n, &Node[K, P]{key: key, priority: oldPriority}) {
 		t.up(n)
 		return nil
 	}
@@ -216,8 +224,8 @@ func (t *Treap[K, P]) Update(key K, priority P) error {
 }
 
 func (t *Treap[K, P]) Delete(key K) error {
-	t.Lock()
-	defer t.Unlock()
+	t.mu.Lock()
+	defer t.mu.Unlock()
 
 	if t.root == nil {
 		return valueNotExistsError(string(key))
@@ -233,9 +241,23 @@ func (t *Treap[K, P]) Delete(key K) error {
 	return nil
 }
 
+func (t *Treap[K, P]) Pop() *Node[K, P] {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if t.root == nil {
+		return nil
+	}
+
+	root := t.root
+	t.bottom(root)
+	t.delete(root)
+	return root
+}
+
 func (t *Treap[K, P]) up(node *Node[K, P]) {
 	for parent := node.parent; parent != nil; parent = node.parent {
-		if t.less(parent.priority, node.priority) {
+		if t.less(parent, node) {
 			break
 		}
 
@@ -254,7 +276,7 @@ func (t *Treap[K, P]) down(node *Node[K, P]) {
 		left, right := node.left, node.right
 
 		if left == nil {
-			if !t.less(node.priority, right.priority) {
+			if !t.less(node, right) {
 				break
 			}
 
@@ -263,7 +285,7 @@ func (t *Treap[K, P]) down(node *Node[K, P]) {
 		}
 
 		if right == nil {
-			if !t.less(node.priority, left.priority) {
+			if !t.less(node, left) {
 				break
 			}
 
@@ -272,16 +294,16 @@ func (t *Treap[K, P]) down(node *Node[K, P]) {
 		}
 
 		higherPriority := positionRight
-		if t.less(left.priority, right.priority) {
+		if t.less(left, right) {
 			higherPriority = positionLeft
 		}
 
-		if higherPriority == positionRight && t.less(node.priority, right.priority) {
+		if higherPriority == positionRight && t.less(node, right) {
 			t.rotateLeft(node)
 			continue
 		}
 
-		if higherPriority == positionLeft && t.less(node.priority, left.priority) {
+		if higherPriority == positionLeft && t.less(node, left) {
 			t.rotateRight(node)
 			continue
 		}
@@ -306,18 +328,19 @@ func (t *Treap[K, P]) bottom(node *Node[K, P]) {
 			continue
 		}
 
-		if t.less(node.left.priority, node.right.priority) {
-			t.rotateLeft(node)
+		if t.less(node.left, node.right) {
+			t.rotateRight(node)
 			continue
 		}
 
-		t.rotateRight(node)
+		t.rotateLeft(node)
 	}
 }
 
 func (t *Treap[K, P]) delete(node *Node[K, P]) {
 	if node.parent == nil {
 		t.root = nil
+		return
 	}
 
 	node.parent.removeChildNode(node)
@@ -357,7 +380,7 @@ func (t *Treap[K, P]) replaceChildNote(oldNote *Node[K, P], newNote *Node[K, P])
 	t.root = newNote
 }
 
-func New[K ~string, P constraints.Integer](less func(i, j P) bool) *Treap[K, P] {
+func New[K ~string, P constraints.Integer](less func(i, j *Node[K, P]) bool) *Treap[K, P] {
 	return &Treap[K, P]{less: less}
 }
 

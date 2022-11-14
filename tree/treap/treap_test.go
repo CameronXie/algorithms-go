@@ -40,8 +40,8 @@ func TestTreap_Insert(t *testing.T) {
 	for n, tc := range cases {
 		t.Run(n, func(t *testing.T) {
 			a := assert.New(t)
-			treap := New[string, int](func(i, j int) bool {
-				return i > j
+			treap := New[string, int](func(i, j *Node[string, int]) bool {
+				return i.Priority() > j.Priority()
 			})
 
 			for _, i := range tc.nodes {
@@ -85,8 +85,8 @@ func TestTreap_Search(t *testing.T) {
 	for n, tc := range cases {
 		t.Run(n, func(t *testing.T) {
 			a := assert.New(t)
-			treap := New[string, int](func(i, j int) bool {
-				return i > j
+			treap := New[string, int](func(i, j *Node[string, int]) bool {
+				return i.Priority() > j.Priority()
 			})
 
 			nodes := []*Node[string, int]{
@@ -132,8 +132,8 @@ func TestTreap_Update(t *testing.T) {
 	for n, tc := range cases {
 		t.Run(n, func(t *testing.T) {
 			a := assert.New(t)
-			treap := New[string, int](func(i, j int) bool {
-				return i > j
+			treap := New[string, int](func(i, j *Node[string, int]) bool {
+				return i.Priority() > j.Priority()
 			})
 
 			nodes := []*Node[string, int]{
@@ -184,8 +184,8 @@ func TestTreap_Delete(t *testing.T) {
 	for n, tc := range cases {
 		t.Run(n, func(t *testing.T) {
 			a := assert.New(t)
-			treap := New[string, int](func(i, j int) bool {
-				return i > j
+			treap := New[string, int](func(i, j *Node[string, int]) bool {
+				return i.Priority() > j.Priority()
 			})
 
 			nodes := []*Node[string, int]{
@@ -224,6 +224,75 @@ func TestTreap_Delete(t *testing.T) {
 	}
 }
 
+func TestTreap_Pop(t *testing.T) {
+	cases := map[string]struct {
+		nodes    []*Node[string, int]
+		expected map[string]int
+		err      error
+	}{
+		"pop nodes": {
+			expected: map[string]int{
+				"B": 3,
+				"A": 2,
+				"C": 1,
+			},
+		},
+		"pop nodes with two nodes have same priority": {
+			nodes: []*Node[string, int]{
+				{
+					key:      "E",
+					priority: 2,
+				},
+			},
+			expected: map[string]int{
+				"B": 3,
+				"A": 2,
+				"E": 2,
+				"C": 1,
+			},
+		},
+	}
+
+	for n, tc := range cases {
+		t.Run(n, func(t *testing.T) {
+			a := assert.New(t)
+			treap := New[string, int](func(i, j *Node[string, int]) bool {
+				if i.Priority() == j.Priority() {
+					return i.Key() < j.Key()
+				}
+
+				return i.Priority() > j.Priority()
+			})
+
+			nodes := []*Node[string, int]{
+				{
+					key:      "A",
+					priority: 2,
+				},
+				{
+					key:      "C",
+					priority: 1,
+				},
+				{
+					key:      "B",
+					priority: 3,
+				},
+			}
+
+			for _, node := range append(nodes, tc.nodes...) {
+				_ = treap.Insert(node)
+			}
+
+			res := make(map[string]int)
+			for i := treap.Pop(); i != nil; i = treap.Pop() {
+				res[i.key] = i.priority
+			}
+
+			a.Equal(tc.expected, res)
+		})
+	}
+}
+
 func TestTreap_Print(t *testing.T) {
 	cases := map[string]struct {
 		nodes    []*Node[string, int]
@@ -252,8 +321,8 @@ func TestTreap_Print(t *testing.T) {
 	for n, tc := range cases {
 		t.Run(n, func(t *testing.T) {
 			a := assert.New(t)
-			treap := New[string, int](func(i, j int) bool {
-				return i > j
+			treap := New[string, int](func(i, j *Node[string, int]) bool {
+				return i.Priority() > j.Priority()
 			})
 
 			for _, i := range tc.nodes {
@@ -292,8 +361,8 @@ func TestTreap_Concurrent(t *testing.T) {
 	for n, tc := range cases {
 		t.Run(n, func(t *testing.T) {
 			a := assert.New(t)
-			treap := New[string, int](func(i, j int) bool {
-				return i > j
+			treap := New[string, int](func(i, j *Node[string, int]) bool {
+				return i.Priority() > j.Priority()
 			})
 
 			nodes := []*Node[string, int]{
